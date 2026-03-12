@@ -183,7 +183,7 @@ void updateTask(void *param)
     vTaskDelete(NULL);
 }
 
-DownloadFirmwareService::DownloadFirmwareService(PsychicHttpServer *server,
+DownloadFirmwareService::DownloadFirmwareService(AsyncWebServer *server,
                                                  SecurityManager *securityManager,
                                                  EventSocket *socket) : _server(server),
                                                                         _securityManager(securityManager),
@@ -209,11 +209,12 @@ void DownloadFirmwareService::begin()
     ESP_LOGV(SVK_TAG, "Registered POST endpoint: %s", GITHUB_FIRMWARE_PATH);
 }
 
-esp_err_t DownloadFirmwareService::downloadUpdate(PsychicRequest *request, JsonVariant &json)
+void DownloadFirmwareService::downloadUpdate(AsyncWebServerRequest *request, JsonVariant &json)
 {
     if (!json.is<JsonObject>())
     {
-        return request->reply(400);
+        request->send(400);
+        return;
     }
 
     String downloadURL = json["download_url"];
@@ -249,7 +250,8 @@ esp_err_t DownloadFirmwareService::downloadUpdate(PsychicRequest *request, JsonV
 #ifdef SERIAL_INFO
         Serial.println("Couldn't create download OTA task");
 #endif
-        return request->reply(500);
+        request->send(500);
+        return;
     }
-    return request->reply(200);
+    request->send(200);
 }
