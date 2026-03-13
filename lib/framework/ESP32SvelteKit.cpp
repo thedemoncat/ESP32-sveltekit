@@ -74,8 +74,6 @@ void ESP32SvelteKit::begin()
 
     _wifiSettingsService.initWiFi();
 
-    _server->begin();
-
 #ifdef EMBED_WWW
     // Serve static resources from PROGMEM
     ESP_LOGV(SVK_TAG, "Registering routes from PROGMEM static resources");
@@ -189,6 +187,7 @@ void ESP32SvelteKit::begin()
     _sleepService.begin();
     _sleepService.attachOnSleepCallback([&]()
                                         {   ESP_LOGI(SVK_TAG, "Attempting to stop server");
+                                            _server->end();
                                             vTaskDelete(_loopTaskHandle);
                                             ESP_LOGI(SVK_TAG, "Server stopped"); });
 #if FT_ENABLED(FT_MQTT)
@@ -204,6 +203,8 @@ void ESP32SvelteKit::begin()
 #if FT_ENABLED(FT_ANALYTICS)
     _analyticsService.begin();
 #endif
+
+    _server->begin();
 
     // Start the loop task
     ESP_LOGV(SVK_TAG, "Starting loop task");

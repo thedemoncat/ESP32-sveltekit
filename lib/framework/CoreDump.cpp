@@ -19,8 +19,6 @@
 #include "esp_partition.h"
 #include "esp_flash.h"
 
-#define MIN(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
-
 CoreDump::CoreDump(AsyncWebServer *server,
                    SecurityManager *securityManager) : _server(server),
                                                        _securityManager(securityManager)
@@ -49,17 +47,21 @@ void CoreDump::coreDump(AsyncWebServerRequest *request)
     }
     ESP_LOGI(SVK_TAG, "Coredump is %u bytes", coredump_size);
 
-    AsyncWebServerResponse *response = request->beginChunkedResponse("application/octet-stream",
-        [coredump_addr, coredump_size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-            if (index >= coredump_size) {
-                return 0;
-            }
-            size_t read_len = MIN(maxLen, coredump_size - index);
-            if (esp_flash_read(esp_flash_default_chip, buffer, coredump_addr + index, read_len)) {
-                ESP_LOGE(SVK_TAG, "Coredump read failed");
-                return 0;
-            }
-            return read_len;
-        });
+    uint8_t *buffer = (uint8_t *)malloc(coredump_size);
+    if (!buffer)
+    {
+        request->send(500, "text/plain", "coredump alloc failed");
+        return;
+    }
+    err = esp_flash_read(esp_flash_default_chip, buffer, coredump_addr, coredump_size);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(SVK_TAG, "Coredump read failed");
+        free(buffer);
+        request->send(500, "text/plain", "coredump read failed");
+        return;
+    }
+    AsyncWebServerResponse *response = request->beginResponse(200, "application/octet-stream", buffer, coredump_size);
     request->send(response);
+    free(buffer);
 }

@@ -139,14 +139,8 @@ void EventSocket::emitEvent(String event, JsonObject &jsonObject, const char *or
     }
 
     int originSubscriptionId = originId[0] ? atoi(originId) : -1;
-    xSemaphoreTake(clientSubscriptionsMutex, portMAX_DELAY);
-    auto &subscriptions = client_subscriptions[event];
-    if (subscriptions.empty())
-    {
-        xSemaphoreGive(clientSubscriptionsMutex);
-        return;
-    }
 
+    std::vector<int> targetClients;
     JsonDocument doc;
     doc["event"] = event;
     doc["data"] = jsonObject;
@@ -167,42 +161,55 @@ void EventSocket::emitEvent(String event, JsonObject &jsonObject, const char *or
 
     output[len] = '\0';
 
+    xSemaphoreTake(clientSubscriptionsMutex, portMAX_DELAY);
+    auto &subscriptions = client_subscriptions[event];
+    if (subscriptions.empty())
+    {
+        xSemaphoreGive(clientSubscriptionsMutex);
+        delete[] output;
+        return;
+    }
+
     if (onlyToSameOrigin && originSubscriptionId > 0)
     {
-        auto *client = _socket.client((uint32_t)originSubscriptionId);
-        if (client)
-        {
-            ESP_LOGV(SVK_TAG, "Emitting event: %s to %s[%u], Message[%d]: %s", event, client->remoteIP().toString().c_str(), client->id(), len, output);
-#if FT_ENABLED(EVENT_USE_JSON)
-            client->text(output, len);
-#else
-            client->binary(output, len);
-#endif
-        }
+        targetClients.push_back(originSubscriptionId);
     }
     else
     {
-        for (int subscription : client_subscriptions[event])
+        for (int subscription : subscriptions)
         {
-            if (subscription == originSubscriptionId)
-                continue;
-            auto *client = _socket.client((uint32_t)subscription);
-            if (!client)
-            {
-                subscriptions.remove(subscription);
-                continue;
-            }
-            ESP_LOGV(SVK_TAG, "Emitting event: %s to %s[%u], Message[%d]: %s", event, client->remoteIP().toString().c_str(), client->id(), len, output);
-#if FT_ENABLED(EVENT_USE_JSON)
-            client->text(output, len);
-#else
-            client->binary(output, len);
-#endif
+            if (subscription != originSubscriptionId)
+                targetClients.push_back(subscription);
         }
+    }
+    xSemaphoreGive(clientSubscriptionsMutex);
+
+    std::vector<int> toRemove;
+    for (int subscription : targetClients)
+    {
+        auto *client = _socket.client((uint32_t)subscription);
+        if (!client)
+        {
+            toRemove.push_back(subscription);
+            continue;
+        }
+        ESP_LOGV(SVK_TAG, "Emitting event: %s to %s[%u], Message[%d]: %s", event, client->remoteIP().toString().c_str(), client->id(), len, output);
+#if FT_ENABLED(EVENT_USE_JSON)
+        client->text(output, len);
+#else
+        client->binary(output, len);
+#endif
+    }
+
+    if (!toRemove.empty())
+    {
+        xSemaphoreTake(clientSubscriptionsMutex, portMAX_DELAY);
+        for (int id : toRemove)
+            client_subscriptions[event].remove(id);
+        xSemaphoreGive(clientSubscriptionsMutex);
     }
 
     delete[] output;
-    xSemaphoreGive(clientSubscriptionsMutex);
 }
 
 void EventSocket::handleEventCallbacks(String event, JsonObject &jsonObject, int originId)

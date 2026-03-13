@@ -177,8 +177,10 @@ void UploadFirmwareService::handleUpload(AsyncWebServerRequest *request,
                 return;
             }
 
-            if (Update.begin(fsize - sizeof(esp_image_header_t)))
+            if (Update.begin(fsize))
             {
+                request->onDisconnect([this]() { handleEarlyDisconnect(); });
+
                 if (_socket)
                 {
                     JsonDocument doc;
@@ -359,6 +361,10 @@ void UploadFirmwareService::handleError(AsyncWebServerRequest *request, int code
 
 void UploadFirmwareService::handleEarlyDisconnect()
 {
+    if (!Update.isRunning())
+    {
+        return;
+    }
     if (!Update.end(true))
     {
         ESP_LOGE(SVK_TAG, "Update error on early disconnect:");

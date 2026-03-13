@@ -24,8 +24,8 @@ AuthenticationService::AuthenticationService(AsyncWebServer *server, SecurityMan
 
 void AuthenticationService::begin()
 {
-    _server->on(SIGN_IN_PATH, HTTP_POST, [this](AsyncWebServerRequest *request, JsonVariant &json)
-                {
+    auto signInCallback = [this](AsyncWebServerRequest *request, JsonVariant &json)
+    {
         if (json.is<JsonObject>()) {
             String username = json["username"];
             String password = json["password"];
@@ -39,7 +39,9 @@ void AuthenticationService::begin()
                 return;
             }
         }
-        request->send(401); });
+        request->send(401);
+    };
+    _server->on(SIGN_IN_PATH, HTTP_POST, _securityManager->wrapCallback(signInCallback, AuthenticationPredicates::NONE_REQUIRED));
 
     ESP_LOGV(SVK_TAG, "Registered POST endpoint: %s", SIGN_IN_PATH);
 

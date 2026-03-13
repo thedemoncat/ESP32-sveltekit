@@ -31,6 +31,7 @@ void RestartService::begin()
 
 void RestartService::restart(AsyncWebServerRequest *request)
 {
+    request->onDisconnect([]()
+                          { restartNow(); });
     request->send(200);
-    restartNow();
 }

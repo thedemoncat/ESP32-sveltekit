@@ -57,7 +57,6 @@ const char *githubCACertificate = "-----BEGIN CERTIFICATE-----\n"
 
 static EventSocket *_socket = nullptr;
 static int previousProgress = 0;
-static String *otaURL = nullptr;
 JsonDocument doc;
 
 void update_started()
