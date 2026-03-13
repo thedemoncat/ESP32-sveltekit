@@ -4,6 +4,43 @@ This page describes what ESP32 core dumps are, how to obtain and analyse them, a
 
 ---
 
+## Dependencies
+
+The script `tools/analyze_dump.py` requires Python 3.7+ and the following packages:
+
+| Package | Purpose |
+|---------|--------|
+| **esp-coredump** | Load and decode ESP32 core dumps, run GDB. |
+| *construct* | Parsing binary structures (installed with esp-coredump). |
+| *esptool* | Optional; used by esp-coredump for some operations. |
+
+### Install with pip
+
+From the project root:
+
+Install the main package only (dependencies will be pulled in):
+
+```bash
+pip install esp-coredump
+```
+
+Use a virtual environment to avoid conflicts with other projects:
+
+```bash
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# Linux/macOS:
+source .venv/bin/activate
+pip install esp-coredump
+```
+
+### GDB (xtensa toolchain)
+
+The script also needs a GDB for your chip (e.g. `xtensa-esp32s3-elf-gdb`). It is usually provided by the **ESP-IDF toolchain**. If you use PlatformIO or ESP-IDF, the toolchain is often already installed; the script will try to find GDB automatically. Otherwise install the [ESP-IDF tools](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/) or pass GDB explicitly with `--gdb /path/to/xtensa-esp32s3-elf-gdb`.
+
+---
+
 ## What are core dumps?
 
 A **core dump** is a snapshot of the device state at the moment of a crash or fatal exception. It includes:
